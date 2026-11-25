@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="A sample Wi-Fi hotspot usage analytics dashboard. Replace the demo data with your own hotspot records.">
+  <title>Wi-Fi Hotspot Analytics</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #172033;
+      --muted: #718096;
+      --line: #e7ebf2;
+      --paper: #ffffff;
+      --canvas: #f5f7fb;
+      --blue: #4263eb;
+      --blue-soft: #edf1ff;
+      --green: #159570;
+      --orange: #e58b32;
+      --purple: #8660c8;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--canvas); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .shell { max-width: 1200px; margin: 0 auto; padding: 32px 24px 48px; }
+    header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 24px; }
+    h1 { margin: 0; font-size: clamp(24px, 4vw, 32px); letter-spacing: -.04em; }
+    .subtitle { color: var(--muted); margin: 5px 0 0; }
+    .demo-badge { border: 1px solid #f1d6a8; background: #fff8eb; color: #885617; border-radius: 999px; padding: 7px 12px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .notice { padding: 12px 15px; border: 1px solid #dfe6ff; border-radius: 12px; background: #f0f3ff; color: #344a9a; margin-bottom: 20px; font-size: 13px; }
+    .toolbar { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-bottom: 16px; color: var(--muted); font-size: 13px; }
+    select { font: inherit; color: var(--ink); background: white; border: 1px solid var(--line); border-radius: 9px; padding: 8px 30px 8px 11px; }
+    .grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+    .card { background: var(--paper); border: 1px solid var(--line); border-radius: 15px; padding: 19px; box-shadow: 0 2px 8px #16254a08; }
+    .metric-label { color: var(--muted); font-size: 13px; }
+    .metric { font-size: 29px; font-weight: 750; letter-spacing: -.04em; margin: 7px 0 2px; }
+    .metric-foot { color: var(--muted); font-size: 12px; }
+    .positive { color: var(--green); font-weight: 650; }
+    .section { margin-top: 16px; }
+    .section-title { margin: 0; font-size: 16px; letter-spacing: -.02em; }
+    .section-subtitle { color: var(--muted); font-size: 12px; margin: 3px 0 14px; }
+    .charts { display: grid; grid-template-columns: 1.65fr 1fr; gap: 16px; }
+    .chart-wrap { height: 245px; position: relative; }
+    svg { display: block; width: 100%; height: 100%; overflow: visible; }
+    .axis { stroke: #e8ecf3; stroke-width: 1; }
+    .axis-label { fill: #8792a5; font-size: 11px; }
+    .area { fill: url(#fill); }
+    .line { fill: none; stroke: var(--blue); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+    .dot { fill: white; stroke: var(--blue); stroke-width: 2; }
+    .legend { color: var(--muted); font-size: 12px; display: flex; align-items: center; gap: 7px; }
+    .legend:before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--blue); }
+    .bars { height: 210px; display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; padding: 8px 2px 24px; border-bottom: 1px solid var(--line); position: relative; }
+    .bar-col { height: 100%; flex: 1; display: flex; align-items: flex-end; position: relative; }
+    .bar { width: 100%; min-height: 5px; background: #dce4ff; border-radius: 5px 5px 2px 2px; transition: background .2s; }
+    .bar.peak { background: var(--blue); }
+    .bar-label { position: absolute; bottom: -23px; left: 50%; transform: translateX(-50%); font-size: 10px; color: #8792a5; }
+    .lower { display: grid; grid-template-columns: 1fr 1.25fr; gap: 16px; }
+    .breakdown { display: grid; gap: 16px; }
+    .break-row { display: grid; grid-template-columns: 82px 1fr 44px; align-items: center; gap: 10px; font-size: 13px; }
+    .break-name { color: #4a5568; }
+    .track { height: 8px; background: #edf0f5; border-radius: 9px; overflow: hidden; }
+    .fill { height: 100%; border-radius: inherit; background: var(--blue); }
+    .fill.mobile { background: var(--green); }.fill.laptop { background: var(--orange); }.fill.other { background: var(--purple); }
+    .break-value { text-align: right; font-weight: 650; }
+    .insights { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .insight { padding: 13px; border-radius: 11px; background: #f7f8fc; color: #465166; font-size: 13px; }
+    .insight strong { display: block; color: var(--ink); margin-bottom: 4px; }
+    footer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 20px; }
+    @media (max-width: 850px) { .grid { grid-template-columns: repeat(2, 1fr); }.charts,.lower { grid-template-columns: 1fr; } }
+    @media (max-width: 520px) { .shell { padding: 23px 15px 35px; } header { display: block; }.demo-badge { display: inline-block; margin-top: 12px; }.grid { gap: 10px; }.card { padding: 15px; }.metric { font-size: 25px; }.insights { grid-template-columns: 1fr; }.toolbar { justify-content: flex-start; } }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div>
+        <h1>Wi-Fi hotspot analytics</h1>
+        <p class="subtitle">A clear view of connections, usage, and peak demand.</p>
+      </div>
+      <span class="demo-badge">DEMO DATA · NOT LIVE</span>
+    </header>
+
+    <div class="notice"><strong>About this dashboard:</strong> The figures below are illustrative sample data for a fictional hotspot. They are not measurements from your network. Connect your hotspot logs or replace the sample dataset in the page script to analyze actual usage.</div>
+
+    <div class="toolbar">
+      <label for="period">Reporting period</label>
+      <select id="period" aria-label="Reporting period">
+        <option value="7">Last 7 days</option>
+        <option value="14">Last 14 days</option>
+        <option value="30">Last 30 days</option>
+      </select>
+    </div>
+
+    <section class="grid" aria-label="Key metrics">
+      <article class="card"><div class="metric-label">Total sessions</div><div class="metric" id="sessions">2,486</div><div class="metric-foot"><span class="positive">↑ 12.8%</span> vs. previous period</div></article>
+      <article class="card"><div class="metric-label">Unique devices</div><div class="metric" id="devices">1,734</div><div class="metric-foot">About 1.4 sessions per device</div></article>
+      <article class="card"><div class="metric-label">Data transferred</div><div class="metric" id="data">186.4 GB</div><div class="metric-foot">Average 75 MB per session</div></article>
+      <article class="card"><div class="metric-label">Average session</div><div class="metric" id="duration">38 min</div><div class="metric-foot">Median session: 24 min</div></article>
+    </section>
+
+    <section class="charts section" aria-label="Usage charts">
+      <article class="card">
+        <h2 class="section-title">Daily connections</h2>
+        <p class="section-subtitle">Number of hotspot sessions by day</p>
+        <div class="legend">Sessions</div>
+        <div class="chart-wrap"><svg id="trend" viewBox="0 0 640 230" role="img" aria-label="Line chart showing daily Wi-Fi sessions"></svg></div>
+      </article>
+      <article class="card">
+        <h2 class="section-title">Busy hours</h2>
+        <p class="section-subtitle">Average connected devices by time of day</p>
+        <div class="bars" id="hours" role="img" aria-label="Bar chart showing busy hours"></div>
+      </article>
+    </section>
+
+    <section class="lower section" aria-label="Device mix and findings">
+      <article class="card">
+        <h2 class="section-title">Device mix</h2>
+        <p class="section-subtitle">Share of unique connected devices</p>
+        <div class="breakdown">
+          <div class="break-row"><span class="break-name">Phones</span><div class="track"><div class="fill mobile" style="width:62%"></div></div><span class="break-value">62%</span></div>
+          <div class="break-row"><span class="break-name">Laptops</span><div class="track"><div class="fill laptop" style="width:24%"></div></div><span class="break-value">24%</span></div>
+          <div class="break-row"><span class="break-name">Tablets</span><div class="track"><div class="fill" style="width:9%"></div></div><span class="break-value">9%</span></div>
+          <div class="break-row"><span class="break-name">Other</span><div class="track"><div class="fill other" style="width:5%"></div></div><span class="break-value">5%</span></div>
+        </div>
+      </article>
+      <article class="card">
+        <h2 class="section-title">What the sample suggests</h2>
+        <p class="section-subtitle">Example observations from the demo data</p>
+        <div class="insights">
+          <div class="insight"><strong>Evening is busiest</strong>Connections peak around 6–8 PM. Consider checking access point capacity during this window.</div>
+          <div class="insight"><strong>Phones dominate</strong>Phones account for 62% of sample devices; prioritize a smooth mobile sign-in experience.</div>
+          <div class="insight"><strong>Track repeat usage</strong>Compare unique devices with sessions to understand return visits and spot unusual changes.</div>
+        </div>
+      </article>
+    </section>
+    <footer>Privacy tip: use aggregated counts and avoid storing personally identifiable browsing data.</footer>
+  </main>
+
+  <script>
+    // Illustrative values only. Replace with aggregated counts from your own hotspot logs.
+    const reports = {
+      7: { sessions: '2,486', devices: '1,734', data: '186.4 GB', duration: '38 min', trend: [258, 301, 287, 342, 316, 405, 377], labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] },
+      14: { sessions: '4,792', devices: '3,128', data: '354.8 GB', duration: '37 min', trend: [260, 292, 283, 319, 301, 366, 351, 258, 301, 287, 342, 316, 405, 377], labels: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14'] },
+      30: { sessions: '10,214', devices: '6,450', data: '768.2 GB', duration: '36 min', trend: [250, 268, 291, 275, 300, 319, 295, 340, 310, 328, 350, 321, 365, 344, 381, 352, 338, 370, 399, 361, 345, 382, 410, 376, 397, 425, 388, 402, 438, 416], labels: Array.from({length: 30}, (_, i) => String(i + 1)) }
+    };
+    const hourly = [12, 8, 5, 4, 6, 14, 29, 48, 56, 49, 42, 51, 63, 72, 68, 61, 75, 91, 100, 87, 67, 45, 28, 18];
+
+    function drawTrend(values, labels) {
+      const svg = document.getElementById('trend');
+      const w = 640, h = 230, left = 38, right = 12, top = 14, bottom = 31;
+      const max = Math.ceil(Math.max(...values) / 100) * 100;
+      const x = i => left + i * (w - left - right) / Math.max(values.length - 1, 1);
+      const y = v => h - bottom - v * (h - top - bottom) / max;
+      const points = values.map((v, i) => `${x(i)},${y(v)}`).join(' ');
+      let markup = '<defs><linearGradient id="fill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="#4263eb" stop-opacity=".2"/><stop offset="100%" stop-color="#4263eb" stop-opacity="0"/></linearGradient></defs>';
+      for (let i = 0; i <= 4; i++) {
+        const value = max * i / 4, yy = y(value);
+        markup += `<line class="axis" x1="${left}" x2="${w-right}" y1="${yy}" y2="${yy}"/><text class="axis-label" x="${left-8}" y="${yy+4}" text-anchor="end">${Math.round(value)}</text>`;
+      }
+      markup += `<polygon class="area" points="${left},${h-bottom} ${points} ${x(values.length-1)},${h-bottom}"/><polyline class="line" points="${points}"/>`;
+      values.forEach((v, i) => { if (values.length <= 14 || i % 3 === 0 || i === values.length - 1) markup += `<circle class="dot" cx="${x(i)}" cy="${y(v)}" r="3.5"><title>${labels[i]}: ${v} sessions</title></circle>`; });
+      const step = values.length > 14 ? 4 : 1;
+      labels.forEach((label, i) => { if (i % step === 0 || i === labels.length - 1) markup += `<text class="axis-label" x="${x(i)}" y="${h-7}" text-anchor="middle">${label}</text>`; });
+      svg.innerHTML = markup;
+    }
+    function drawHours() {
+      const box = document.getElementById('hours');
+      box.innerHTML = hourly.map((value, hour) => `<div class="bar-col"><div class="bar ${value === 100 ? 'peak' : ''}" style="height:${value}%" title="${String(hour).padStart(2, '0')}:00 — ${value}% of peak activity"></div>${hour % 3 === 0 ? `<span class="bar-label">${hour === 0 ? '12a' : hour < 12 ? hour + 'a' : hour === 12 ? '12p' : hour - 12 + 'p'}</span>` : ''}</div>`).join('');
+    }
+    function render() {
+      const report = reports[document.getElementById('period').value];
+      for (const key of ['sessions', 'devices', 'data', 'duration']) document.getElementById(key).textContent = report[key];
+      drawTrend(report.trend, report.labels);
+    }
+    document.getElementById('period').addEventListener('change', render);
+    drawHours();
+    render();
+  </script>
+</body>
+</html>
